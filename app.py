@@ -5,9 +5,13 @@ from flask import Flask, jsonify, request
 from flask_sqlalchemy import SQLAlchemy
 from io import BytesIO
 from flask_migrate import Migrate
+from flask_cors import CORS  # Importa CORS
 
 # Inicialización de la aplicación Flask
 app = Flask(__name__)
+
+# Configura CORS para aceptar solicitudes de cualquier origen
+CORS(app, origins="http://localhost:3000")  # Solo permite solicitudes de `localhost:3000`
 
 # Configuración de la base de datos (SQLite en este caso)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///cancelados.db'
@@ -92,16 +96,13 @@ def download_csv():
 @app.route('/get_data', methods=['GET'])
 def get_data():
     try:
-        # Obtener parámetros de paginación (por ejemplo, página y límite de registros por página)
-        page = request.args.get('page', 1, type=int)  # Página actual (por defecto es 1)
-        per_page = request.args.get('per_page', 50, type=int)  # Registros por página (por defecto es 50)
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 50, type=int)
 
-        # Consultar los registros con paginación
-        cancelados = Cancelado.query.paginate(page=page, per_page=per_page, error_out=False).items
-
-        # Crear una lista de diccionarios con los resultados
+        cancelados = Cancelado.query.paginate(page=page, per_page=per_page, error_out=False)
+        
         result = []
-        for cancelado in cancelados:
+        for cancelado in cancelados.items:
             result.append({
                 'id': cancelado.id,
                 'RFC': cancelado.RFC,
@@ -113,13 +114,31 @@ def get_data():
                 'FECHA_PUBLICACION': cancelado.FECHA_PUBLICACION,
                 'ENTIDAD_FEDERATIVA': cancelado.ENTIDAD_FEDERATIVA
             })
-
-        # Devolver los datos como respuesta JSON
-        return jsonify(result)
+        
+        # Agregar el total de registros a la respuesta
+        total_count = Cancelado.query.count()  # Número total de registros
+        return jsonify({
+            'data': result,
+            'total_count': total_count,  # Incluir el total de registros
+            'total_pages': cancelados.pages  # Incluir el total de páginas
+        })
 
     except Exception as e:
-        # Manejo de errores
         return jsonify({'message': f'Hubo un problema al obtener los datos: {str(e)}', 'success': False})
+
+
+
+# Ruta para borrar todos los registros de la base de datos
+@app.route('/delete_all', methods=['DELETE'])
+def delete_all():
+    try:
+        # Borrar todos los registros de la tabla
+        db.session.query(Cancelado).delete()
+        db.session.commit()  # Confirmar la transacción
+        return jsonify({'success': True, 'message': 'Todos los registros han sido eliminados correctamente'})
+
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Hubo un problema al eliminar los datos: {str(e)}'})
 
 
 # Ejecutar el servidor Flask
