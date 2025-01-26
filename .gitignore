@@ -34,3 +34,9 @@ migrations/
 # Otros archivos temporales que puedas generar
 *.bak
 *.swp
+
+*.log
+*.tmp
+*.zip
+*.tar.gz
+*.psd
